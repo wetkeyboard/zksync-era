@@ -27,7 +27,7 @@ with pkgs; mkShell.override { inherit stdenv; } {
     export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="clang"
 
     if [ "x$NIX_LD" = "x" ]; then
-      export NIX_LD="$ZK_NIX_LD"
+        export NIX_LD=$(<${clangStdenv.cc}/nix-support/dynamic-linker)
     fi
     if [ "x$NIX_LD_LIBRARY_PATH" = "x" ]; then
       export NIX_LD_LIBRARY_PATH="$ZK_NIX_LD_LIBRARY_PATH"
@@ -37,6 +37,5 @@ with pkgs; mkShell.override { inherit stdenv; } {
   '';
 
   ZK_NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [ ];
-  ZK_NIX_LD = builtins.readFile "${clangStdenv.cc}/nix-support/dynamic-linker";
 }
 

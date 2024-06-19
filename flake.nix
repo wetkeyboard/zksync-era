@@ -15,7 +15,7 @@
 # $ nix build .#zksync_server.block_reverter
 #
 # To enter the development shell, run:
-# $ nix develop --impure
+# $ nix develop
 #
 # To vendor the dependencies manually, run:
 # $ nix shell .#cargo-vendor -c cargo vendor --no-merge-sources
