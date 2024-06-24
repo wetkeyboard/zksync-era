@@ -1,0 +1,25 @@
+[package]
+name = "gossipnet_loadtest"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+zksync_protobuf.workspace = true
+zksync_consensus_crypto.workspace = true
+zksync_consensus_network.workspace = true
+zksync_consensus_roles.workspace = true
+zksync_concurrency.workspace = true
+zksync_types.workspace = true
+zksync_web3_decl.workspace = true
+zksync_vlog.workspace = true
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
