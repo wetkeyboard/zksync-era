@@ -14,7 +14,9 @@ use circuit_definitions::{
 };
 use tokio::sync::Semaphore;
 use tracing::Instrument;
-use zkevm_test_harness::geometry_config::get_geometry_config;
+use zkevm_test_harness::{
+    geometry_config::get_geometry_config, witness::oracle::WitnessGenerationArtifact,
+};
 use zksync_config::configs::FriWitnessGeneratorConfig;
 use zksync_multivm::vm_latest::{
     constants::MAX_CYCLES_FOR_TX, HistoryDisabled, StorageOracle as VmStorageOracle,
@@ -405,7 +407,7 @@ type Witness = (
 );
 
 #[tracing::instrument(skip_all, fields(l1_batch = %block_number))]
-async fn generate_witness(
+pub async fn generate_witness(
     block_number: L1BatchNumber,
     object_store: Arc<dyn ObjectStore>,
     input: WitnessInputData,
@@ -456,6 +458,22 @@ async fn generate_witness(
             .to_str()
             .expect("Path to KZG trusted setup is not a UTF-8 string");
 
+        let artifacts_callback = |artifact: WitnessGenerationArtifact| match artifact {
+            WitnessGenerationArtifact::BaseLayerCircuit(circuit) => {
+                let parent_span = span.clone();
+                tracing::info_span!(parent: parent_span, "send_circuit").in_scope(|| {
+                    circuit_sender
+                        .blocking_send(circuit)
+                        .expect("failed to send circuit from harness");
+                });
+            }
+            WitnessGenerationArtifact::RecursionQueue((a, b, c)) => queue_sender
+                .blocking_send((a as u8, b, c))
+                .expect("failed to send recursion queue from harness"),
+            WitnessGenerationArtifact::SortedMemoryQueueWitness(_) => {} // TODO SAVE
+            WitnessGenerationArtifact::UnsortedMemoryQueueWitness(_) => {} // TODO SAVE
+        };
+
         let (scheduler_witness, block_witness) = zkevm_test_harness::external_calls::run(
             Address::zero(),
             BOOTLOADER_ADDRESS,
@@ -473,19 +491,7 @@ async fn generate_witness(
             tree,
             path,
             input.eip_4844_blobs.blobs(),
-            |circuit| {
-                let parent_span = span.clone();
-                tracing::info_span!(parent: parent_span, "send_circuit").in_scope(|| {
-                    circuit_sender
-                        .blocking_send(circuit)
-                        .expect("failed to send circuit from harness");
-                });
-            },
-            |a, b, c| {
-                queue_sender
-                    .blocking_send((a as u8, b, c))
-                    .expect("failed to send recursion queue from harness")
-            },
+            artifacts_callback,
         );
         (scheduler_witness, block_witness)
     })

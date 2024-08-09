@@ -52,7 +52,7 @@ pub struct LeafAggregationArtifacts {
 }
 
 #[derive(Debug)]
-struct BlobUrls {
+pub struct BlobUrls {
     circuit_ids_and_urls: Vec<(u8, String)>,
     aggregations_urls: String,
 }
@@ -466,7 +466,7 @@ async fn get_artifacts(
     skip_all,
     fields(l1_batch = %artifacts.block_number, circuit_id = %artifacts.circuit_id)
 )]
-async fn save_artifacts(
+pub async fn save_artifacts(
     artifacts: LeafAggregationArtifacts,
     object_store: &dyn ObjectStore,
 ) -> BlobUrls {
