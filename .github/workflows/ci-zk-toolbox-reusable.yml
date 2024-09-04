@@ -104,6 +104,32 @@ jobs:
           --port-offset 2000 \
           --chain validium
 
+
+      - name: Create and initialize chain with Consensus
+        run: |
+          ci_run zk_inception chain create \
+          --chain-name consensus \
+          --chain-id sequential \
+          --prover-mode no-proofs \
+          --wallet-creation localhost \
+          --l1-batch-commit-data-generator-mode rollup \
+          --base-token-address 0x0000000000000000000000000000000000000001 \
+          --base-token-price-nominator 1 \
+          --base-token-price-denominator 1 \
+          --set-as-default false \
+          --ignore-prerequisites
+
+          ci_run zk_inception chain init \
+          --deploy-paymaster \
+          --l1-rpc-url=http://localhost:8545 \
+          --server-db-url=postgres://postgres:notsecurepassword@localhost:5432 \
+          --server-db-name=zksync_server_localhost_consensus \
+          --prover-db-url=postgres://postgres:notsecurepassword@localhost:5432 \
+          --prover-db-name=zksync_prover_localhost_consensus \
+          --port-offset 4000 \
+          --chain consensus
+
+
       - name: Create and initialize chain with Custom Token
         run: |
           ci_run zk_inception chain create \
@@ -137,6 +163,7 @@ jobs:
           ci_run zk_inception server --ignore-prerequisites --chain era &> ${{ env.SERVER_LOGS_DIR }}/rollup.log &
           ci_run zk_inception server --ignore-prerequisites --chain validium &> ${{ env.SERVER_LOGS_DIR }}/validium.log &
           ci_run zk_inception server --ignore-prerequisites --chain custom_token &> ${{ env.SERVER_LOGS_DIR }}/custom_token.log &
+          ci_run zk_inception server --ignore-prerequisites --chain consensus &> ${{ env.SERVER_LOGS_DIR }}/custom_token.log &
           ci_run sleep 5
 
       - name: Run integration tests
@@ -167,6 +194,7 @@ jobs:
           ci_run zk_inception external-node configs --db-url=postgres://postgres:notsecurepassword@localhost:5432 \
           --db-name=zksync_en_localhost_era_custom_token --l1-rpc-url=http://localhost:8545 --chain custom_token
           ci_run zk_inception external-node init --ignore-prerequisites --chain custom_token
+          ci_run zk_inception external-node init --ignore-prerequisites --chain consensus 
 
       - name: Run recovery tests (from snapshot)
         run: |
@@ -204,6 +232,7 @@ jobs:
           ci_run zk_inception external-node run --ignore-prerequisites --chain era &> ${{ env.EXTERNAL_NODE_LOGS_DIR }}/rollup.log &
           ci_run zk_inception external-node run --ignore-prerequisites --chain validium &> ${{ env.EXTERNAL_NODE_LOGS_DIR }}/validium.log &
           ci_run zk_inception external-node run --ignore-prerequisites --chain custom_token &> ${{ env.EXTERNAL_NODE_LOGS_DIR }}/custom_token.log &
+          ci_run zk_inception external-node run --ignore-prerequisites --chain consensus -a --enable-consensus &> ${{ env.EXTERNAL_NODE_LOGS_DIR }}/custom_token.log &
           ci_run sleep 5
 
       - name: Run integration tests en
