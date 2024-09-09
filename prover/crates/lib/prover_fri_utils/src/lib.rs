@@ -97,9 +97,7 @@ pub fn get_base_layer_circuit_id_for_recursive_layer(recursive_layer_circuit_id:
 
 pub fn get_numeric_circuit_id(circuit_wrapper: &CircuitWrapper) -> u8 {
     match circuit_wrapper {
-        CircuitWrapper::Base(circuit) | CircuitWrapper::BasePartial((circuit, _)) => {
-            circuit.numeric_circuit_type()
-        }
+        CircuitWrapper::Base(circuit) => circuit.numeric_circuit_type(),
         CircuitWrapper::Recursive(circuit) => circuit.numeric_circuit_type(),
     }
 }

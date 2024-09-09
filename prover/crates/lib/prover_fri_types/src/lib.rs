@@ -43,7 +43,6 @@ pub struct CircuitAuxData {
 pub enum CircuitWrapper {
     Base(ZkSyncBaseLayerCircuit),
     Recursive(ZkSyncRecursiveLayerCircuit),
-    BasePartial((ZkSyncBaseLayerCircuit, CircuitAuxData)),
 }
 
 impl StoredObject for CircuitWrapper {
