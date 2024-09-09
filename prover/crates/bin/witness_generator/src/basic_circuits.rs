@@ -435,8 +435,7 @@ async fn generate_witness(
     let (circuit_sender, mut circuit_receiver) = tokio::sync::mpsc::channel(1);
     let (queue_sender, mut queue_receiver) = tokio::sync::mpsc::channel(1);
 
-    use std::sync::mpsc::sync_channel;
-    use std::thread;
+    use std::{sync::mpsc::sync_channel, thread};
 
     let (artifacts_sender, artifacts_receiver) = sync_channel(1);
 
