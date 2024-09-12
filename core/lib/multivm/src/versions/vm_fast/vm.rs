@@ -58,7 +58,6 @@ const VM_VERSION: MultiVMSubversion = MultiVMSubversion::IncreasedBootloaderMemo
 pub struct Vm<S> {
     pub(crate) world: World<S, CircuitsTracer>,
     pub(crate) inner: VirtualMachine<CircuitsTracer, World<S, CircuitsTracer>>,
-    gas_for_account_validation: u32,
     pub(crate) bootloader_state: BootloaderState,
     pub(crate) batch_env: L1BatchEnv,
     pub(crate) system_env: SystemEnv,
@@ -74,6 +73,14 @@ impl<S: ReadStorage> Vm<S> {
         tracer: &mut CircuitsTracer,
         track_refunds: bool,
     ) -> (ExecutionResult, Refunds) {
+        struct AccountValidationGasSplit {
+            gas_given: u32,
+            gas_hidden: u32,
+        }
+        let mut gas_left_for_account_validation =
+            self.system_env.default_validation_computational_gas_limit;
+        let mut account_validation_gas_split = None;
+
         let mut refunds = Refunds {
             gas_refunded: 0,
             operator_suggested_refund: 0,
@@ -103,8 +110,30 @@ impl<S: ReadStorage> Vm<S> {
             };
 
             match Hook::from_u32(hook) {
-                Hook::AccountValidationEntered | Hook::ValidationExited => {
-                    // TODO (PLA-908): implement account validation
+                Hook::AccountValidationEntered => {
+                    assert!(
+                        account_validation_gas_split.is_none(),
+                        "Account validation can't be nested"
+                    );
+                    let gas = self.gas_remaining();
+                    let gas_given = gas.min(gas_left_for_account_validation);
+                    account_validation_gas_split = Some(AccountValidationGasSplit {
+                        gas_given,
+                        gas_hidden: gas - gas_given,
+                    });
+                    self.inner.current_frame().set_gas(gas_given);
+                }
+
+                Hook::ValidationExited => {
+                    if let Some(AccountValidationGasSplit {
+                        gas_given,
+                        gas_hidden,
+                    }) = account_validation_gas_split.take()
+                    {
+                        let gas_left = self.inner.current_frame().gas();
+                        gas_left_for_account_validation -= gas_given - gas_left;
+                        self.inner.current_frame().set_gas(gas_left + gas_hidden);
+                    }
                 }
                 Hook::TxHasEnded => {
                     if let VmExecutionMode::OneTx = execution_mode {
@@ -442,7 +471,6 @@ impl<S: ReadStorage> Vm<S> {
         let mut this = Self {
             world: World::new(storage, program_cache),
             inner,
-            gas_for_account_validation: system_env.default_validation_computational_gas_limit,
             bootloader_state: BootloaderState::new(
                 system_env.execution_mode,
                 bootloader_memory.clone(),
@@ -650,7 +678,6 @@ impl<S: ReadStorage> VmInterface for Vm<S> {
 struct VmSnapshot {
     vm_snapshot: zksync_vm2::Snapshot,
     bootloader_snapshot: BootloaderStateSnapshot,
-    gas_for_account_validation: u32,
 }
 
 impl<S: ReadStorage> VmInterfaceHistoryEnabled for Vm<S> {
@@ -664,7 +691,6 @@ impl<S: ReadStorage> VmInterfaceHistoryEnabled for Vm<S> {
         self.snapshot = Some(VmSnapshot {
             vm_snapshot: self.inner.snapshot(),
             bootloader_snapshot: self.bootloader_state.get_snapshot(),
-            gas_for_account_validation: self.gas_for_account_validation,
         });
     }
 
@@ -672,12 +698,10 @@ impl<S: ReadStorage> VmInterfaceHistoryEnabled for Vm<S> {
         let VmSnapshot {
             vm_snapshot,
             bootloader_snapshot,
-            gas_for_account_validation,
         } = self.snapshot.take().expect("no snapshots to rollback to");
 
         self.inner.rollback(vm_snapshot);
         self.bootloader_state.apply_snapshot(bootloader_snapshot);
-        self.gas_for_account_validation = gas_for_account_validation;
 
         self.delete_history_if_appropriate();
     }
@@ -691,10 +715,6 @@ impl<S: ReadStorage> VmInterfaceHistoryEnabled for Vm<S> {
 impl<S: fmt::Debug> fmt::Debug for Vm<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vm")
-            .field(
-                "gas_for_account_validation",
-                &self.gas_for_account_validation,
-            )
             .field("bootloader_state", &self.bootloader_state)
             .field("storage", &self.world.storage)
             .field("program_cache", &self.world.program_cache)
